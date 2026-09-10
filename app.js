@@ -1,18 +1,22 @@
 import { ACTIONS, DEFAULT_ACTION_IDS, DEMO } from './catalog.js';
-import { MOVEMENT, firstFrame, selectedActions, validatePlan, readPetArchive, makePetArchive } from './core.js';
+import { MOVEMENT, firstFrame, selectedActions, validatePlan, readPetArchive } from './core.js';
 import { listPets, getMedia, savePet, removePet } from './storage.js';
+import { exportArchive, exportSingle, exportSheet } from './exports.js';
+import { createWorkflow } from './workflow.js';
 
 const $ = id => document.getElementById(id);
 const local = document.querySelector('meta[name="luma-runtime"]')?.content === 'local';
 let state = { pets: [], jobs: [], desktop: { connected: false }, provider: {} };
 let selected = new Set(DEFAULT_ACTION_IDS), activePet = DEMO, activeMedia = {}, reference = null, poseId = 'idle';
-let activeUrls = [], libraryUrls = [], previewRevision = 0, toastTimer, openedJobId = null;
+let activeUrls = [], libraryUrls = [], thumbnailUrls = [], previewRevision = 0, toastTimer, openedJobId = null;
+let referenceRevision = 0;
+let referenceLoads = 0;
+let workflow;
 const terminal = new Set(['completed', 'failed', 'cancelled', 'interrupted', 'awaiting-selection']);
 const statusLabels = { queued: '等待制作', 'candidates-generating': '制作旧版候选', 'actions-generating': '制作姿态图', processing: '处理图片', completed: '制作完成', failed: '制作失败', cancelled: '已取消', interrupted: '已中断', 'awaiting-selection': '旧版候选待选择' };
 const imageType = file => /\.webp$/i.test(file) ? 'image/webp' : /\.jpe?g$/i.test(file) ? 'image/jpeg' : /\.gif$/i.test(file) ? 'image/gif' : 'image/png';
 const currentCatalog = () => [...ACTIONS, ...activePet.actions.filter(action => !MOVEMENT.has(action.id) && !ACTIONS.some(item => item.id === action.id)).map(({ id, label }) => ({ id, label }))];
 const selectedList = () => selectedActions(currentCatalog(), selected);
-const escapeName = name => name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 60) || '绒星角色';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -46,11 +50,6 @@ function dataUrl(blob) {
     reader.readAsDataURL(blob);
   });
 }
-function download(bytes, name, type) {
-  const url = URL.createObjectURL(new Blob([bytes], { type }));
-  const link = el('a'); link.href = url; link.download = name; link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
-}
 async function validateImage(blob) {
   const bitmap = await createImageBitmap(blob);
   const valid = bitmap.width > 0 && bitmap.height > 0 && bitmap.width <= 12000 && bitmap.height <= 12000 && bitmap.width * bitmap.height <= 40e6;
@@ -58,12 +57,25 @@ async function validateImage(blob) {
   if (!valid) throw new Error('图片尺寸过大，请缩小到 4000 万像素以内。');
 }
 async function setReference(file) {
+  const revision = ++referenceRevision;
   if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 20 * 1024 * 1024) throw new Error('请选择不超过 20 MB 的 PNG、JPG 或 WebP 图片。');
   await validateImage(file);
   const value = await dataUrl(file);
+  if (revision !== referenceRevision) return;
   reference = { name: file.name.slice(0, 120), dataUrl: value };
   $('reference-preview').src = value; $('reference-preview').hidden = false; $('reference-hint').hidden = true;
   if (!$('pet-name').value) $('pet-name').value = file.name.replace(/\.[^.]+$/, '').slice(0, 40);
+}
+async function loadPlan(plan) {
+  ++referenceRevision;
+  const raw = atob(plan.reference.dataUrl.split(',')[1]);
+  const blob = new Blob([Uint8Array.from(raw, char => char.charCodeAt(0))], { type: plan.reference.dataUrl.slice(5, plan.reference.dataUrl.indexOf(';')) });
+  await validateImage(blob);
+  reference = plan.reference;
+  $('reference-preview').src = reference.dataUrl; $('reference-preview').hidden = false; $('reference-hint').hidden = true;
+  $('pet-name').value = plan.name; $('pet-style').value = plan.style;
+  document.querySelector('[name=kind][value=' + plan.kind + ']').checked = true;
+  selected = new Set(plan.actionIds); renderChoices(); showError('form-error');
 }
 function renderChoices() {
   for (const [target, actions] of [
@@ -88,19 +100,31 @@ function updateSelection() {
   renderPreview();
 }
 function renderPreview() {
+  thumbnailUrls.forEach(url => URL.revokeObjectURL(url)); thumbnailUrls = [];
   $('active-pet-name').textContent = activePet.name + (activePet.id === 'demo' ? ' · 示例' : '');
   $('preview-badge').textContent = activePet.id === 'demo' ? '示例' : '我的角色';
   const available = selectedList().filter(action => activePet.actions.some(item => item.id === action.id));
   const missing = selectedList().filter(action => !activePet.actions.some(item => item.id === action.id));
   $('preview-count').textContent = available.length + ' 张可导出' + (missing.length ? ' · ' + missing.length + ' 张待制作' : '');
+  $('export-pet').textContent = activePet.id === 'demo' ? '下载示例角色包' : '导出轻量角色包';
   $('preview-help').textContent = activePet.id === 'demo' ? '这是小橘示例，可直接导出体验。你的新形象需要在本机完成制作。' : missing.length ? '虚线姿态尚未制作。导出只包含已完成的 ' + available.length + ' 张图。' : '每种姿态导出一张静态 PNG。导入的动画包在这里使用首帧。';
   $('show-desktop').hidden = !local || !state.desktop.connected || activePet.id === 'demo';
   $('add-poses').hidden = !local || activePet.id === 'demo' || !missing.length;
   $('add-poses').textContent = '在本机补充这 ' + missing.length + ' 张姿态';
   const visible = selectedList();
   if (!visible.some(action => action.id === poseId)) poseId = 'idle';
+  $('export-image').disabled = !activePet.actions.some(action => action.id === poseId);
   $('preview-poses').replaceChildren(...visible.map(action => {
-    const button = el('button', '', action.label);
+    const button = el('button');
+    const asset = activePet.actions.find(item => item.id === action.id);
+    if (asset) {
+      const source = firstFrame(asset), thumbnail = el('img');
+      thumbnail.src = activeMedia[source] ? URL.createObjectURL(activeMedia[source]) : source;
+      if (activeMedia[source]) thumbnailUrls.push(thumbnail.src);
+      thumbnail.alt = ''; thumbnail.width = 72; thumbnail.height = 72;
+      button.append(thumbnail);
+    }
+    button.append(el('span', '', action.label));
     button.type = 'button'; button.dataset.pose = action.id;
     button.dataset.missing = String(!activePet.actions.some(item => item.id === action.id));
     button.setAttribute('aria-pressed', String(action.id === poseId));
@@ -156,6 +180,7 @@ async function renderLibrary() {
     }
     card.append(actions); return card;
   }));
+  workflow?.update(state);
 }
 async function importPet(file) {
   if (file.size > 150 * 1024 * 1024) throw new Error('角色包不能超过 150 MB。');
@@ -177,28 +202,13 @@ async function importPet(file) {
     state.pets = [pet, ...state.pets]; renderLibrary();
   }
   await openPet(pet); notify('已导入“' + pet.name + '”，可以预览与导出。');
+  await workflow?.imported(pet);
+  return pet;
 }
 async function exportPet() {
   const pet = activePet, media = activeMedia, actions = selectedList().filter(action => pet.actions.some(item => item.id === action.id));
-  const images = [];
-  for (const action of actions) {
-    const source = firstFrame(pet.actions.find(item => item.id === action.id));
-    let blob = media[source];
-    if (!blob) {
-      const response = await fetch(source);
-      if (!response.ok) throw new Error('图片读取失败：' + action.label);
-      blob = await response.blob();
-    }
-    const bitmap = await createImageBitmap(blob);
-    const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width; canvas.height = bitmap.height;
-    canvas.getContext('2d').drawImage(bitmap, 0, 0); bitmap.close();
-    const png = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-    if (!png) throw new Error('图片导出失败：' + action.label);
-    images.push({ id: action.id, label: action.label, bytes: new Uint8Array(await png.arrayBuffer()) });
-  }
-  download(makePetArchive(pet, images), escapeName(pet.name) + '-' + images.length + '张姿态.zip', 'application/zip');
-  notify('已导出 ' + images.length + ' 张姿态，可导入桌宠或重新导入网站。');
+  const count = await exportArchive(pet, media, actions);
+  notify('已导出 ' + count + ' 张姿态，可导入桌宠或重新导入网站。');
 }
 function renderJobs() {
   const jobs = state.jobs.slice(-8).reverse();
@@ -225,6 +235,7 @@ function applyState(value) {
   state = { pets: value.pets, jobs: value.jobs, desktop: value.desktop, provider: value.provider };
   if (oldLibrary !== state.pets.map(pet => pet.id + ':' + pet.actions.length + ':' + firstFrame(pet.actions[0] || {})).join()) renderLibrary();
   renderJobs();
+  workflow?.update(state);
   if (activePet.id !== 'demo') {
     const updated = state.pets.find(pet => pet.id === activePet.id);
     if (updated && JSON.stringify(updated.actions) !== JSON.stringify(activePet.actions)) { activePet = updated; renderPreview(); }
@@ -239,8 +250,9 @@ const refresh = async () => applyState(await api('/api/state'));
 
 $('reference-file').addEventListener('change', async event => {
   const file = event.target.files[0]; if (!file) return;
+  referenceLoads++; $('create-button').disabled = true;
   try { await setReference(file); showError('form-error'); } catch (error) { showError('form-error', error.message); }
-  event.target.value = '';
+  finally { referenceLoads--; if (!referenceLoads) $('create-button').disabled = false; event.target.value = ''; }
 });
 $('reset-poses').addEventListener('click', () => { selected = new Set(DEFAULT_ACTION_IDS); renderChoices(); });
 $('create-form').addEventListener('submit', async event => {
@@ -249,14 +261,7 @@ $('create-form').addEventListener('submit', async event => {
   try {
     if (!reference) throw new Error('请先放一张参考图。');
     const plan = validatePlan({ format: 'lumapet-plan', version: 1, name: $('pet-name').value, kind: document.querySelector('[name=kind]:checked').value, style: $('pet-style').value, actionIds: [...selected], reference }, ACTIONS);
-    if (local) {
-      const upload = await api('/api/uploads', { name: reference.name, data: reference.dataUrl.split(',')[1] });
-      const job = await api('/api/jobs', { name: plan.name, kind: plan.kind, style: plan.style, actionIds: plan.actionIds, mainUploadId: upload.id, renderMode: 'stills' });
-      openedJobId = job.id; await refresh(); notify('已开始制作 ' + plan.actionIds.length + ' 张姿态，请在下方查看进度。');
-    } else {
-      download(JSON.stringify(plan, null, 2), escapeName(plan.name) + '-制作单.json', 'application/json');
-      notify('制作单已导出，在本机工作台导入后生成。');
-    }
+    await workflow.prepare(plan);
   } catch (error) { showError('form-error', error.message); }
   finally { button.disabled = false; }
 });
@@ -266,15 +271,8 @@ $('plan-file').addEventListener('change', async event => {
   try {
     if (file.size > 29 * 1024 * 1024) throw new Error('制作单过大，请使用不超过 20 MB 的参考图。');
     const plan = validatePlan(JSON.parse(await file.text()), ACTIONS);
-    const raw = atob(plan.reference.dataUrl.split(',')[1]);
-    const blob = new Blob([Uint8Array.from(raw, char => char.charCodeAt(0))], { type: plan.reference.dataUrl.slice(5, plan.reference.dataUrl.indexOf(';')) });
-    await validateImage(blob);
-    reference = plan.reference;
-    $('reference-preview').src = reference.dataUrl; $('reference-preview').hidden = false; $('reference-hint').hidden = true;
-    $('pet-name').value = plan.name; $('pet-style').value = plan.style;
-    document.querySelector('[name=kind][value=' + plan.kind + ']').checked = true;
-    selected = new Set(plan.actionIds); renderChoices(); location.hash = 'create'; showError('form-error');
-    notify('已载入制作单。' + (local ? '点击开始制作即可生成。' : '可以调整后再次导出。'));
+    await loadPlan(plan); await workflow.prepare(plan);
+    notify('已载入制作单，可以继续生成或返回修改设定。');
   } catch (error) { showError('form-error', error.message); location.hash = 'create'; }
   event.target.value = '';
 });
@@ -286,6 +284,13 @@ $('pet-file').addEventListener('change', async event => {
   finally { $('import-pet').disabled = false; $('library-import').disabled = false; event.target.value = ''; }
 });
 $('export-pet').addEventListener('click', () => busy($('export-pet'), exportPet));
+$('export-image').addEventListener('click', () => busy($('export-image'), () => exportSingle(activePet, activeMedia, selectedList().find(action => action.id === poseId))));
+$('export-sheet').addEventListener('click', () => busy($('export-sheet'), () => exportSheet(activePet, activeMedia, selectedList().filter(action => activePet.actions.some(item => item.id === action.id)))));
+document.querySelectorAll('[data-background]').forEach(button => button.addEventListener('click', () => {
+  $('stage').dataset.background = button.dataset.background;
+  document.querySelectorAll('[data-background]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+}));
+document.querySelectorAll('[data-style]').forEach(button => button.addEventListener('click', () => { $('pet-style').value = button.dataset.style; $('pet-style').focus(); }));
 $('show-desktop').addEventListener('click', () => busy($('show-desktop'), async () => {
   await api('/api/desktop/' + activePet.id, { command: 'show' }); notify('已邀请“' + activePet.name + '”到桌面。');
 }));
@@ -295,13 +300,14 @@ $('add-poses').addEventListener('click', () => busy($('add-poses'), async () => 
   const job = await api('/api/pets/' + activePet.id + '/regenerate', { actions: missing.map(action => action.id), renderMode: 'stills' });
   openedJobId = job.id; await refresh(); notify('正在补充 ' + missing.length + ' 张姿态。');
 }));
-function route() {
-  const library = location.hash === '#library';
-  $('create-page').hidden = library; $('library-page').hidden = !library;
+function route(event) {
+  const target = ['create', 'make', 'library', 'guide'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'create';
+  for (const page of ['create', 'make', 'library', 'guide']) $(page + '-page').hidden = target !== page;
   document.querySelectorAll('[data-tab]').forEach(link => {
-    if (link.dataset.tab === (library ? 'library' : 'create')) link.setAttribute('aria-current', 'page');
+    if (link.dataset.tab === target) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
+  if (event) document.querySelector('#' + target + '-page h1')?.focus({ preventScroll: true });
 }
 window.addEventListener('hashchange', route);
 $('settings-open').addEventListener('click', () => {
@@ -325,11 +331,12 @@ $('settings-form').addEventListener('submit', event => {
 });
 $('pose-image').addEventListener('error', () => { $('pose-image').hidden = true; $('pose-empty').hidden = false; $('pose-empty').textContent = '这张图片未能读取，请重新导入角色包。'; });
 $('preview-title').tabIndex = -1;
+document.querySelectorAll('main h1').forEach(heading => { heading.tabIndex = -1; });
+workflow = createWorkflow({ local, api, state: () => state, loadPlan, importPet, openPet, notify });
 renderChoices(); route();
 if (local) {
   $('mode-label').textContent = '本机工作台'; $('settings-open').hidden = false;
-  $('create-button').textContent = '开始制作';
-  $('creation-help').textContent = '使用本机已连接的生成服务，一批最多制作 10 张。完成后可预览、导出或邀请到桌面。';
+  $('creation-help').textContent = '下一步确认生成方式与制作内容。每批最多 10 张，完成后可以导出或邀请到桌面。';
   $('library-help').textContent = '角色保存在这台电脑。可以导出轻量包，在网站上预览与分享文件。';
   try {
     await refresh(); renderLibrary();
@@ -343,3 +350,5 @@ if (local) {
   try { state.pets = await listPets(); renderLibrary(); }
   catch (error) { notify(error.message); }
 }
+await workflow.init();
+workflow.update(state);

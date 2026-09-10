@@ -1,10 +1,11 @@
 let database;
 function openDatabase() {
   if (!database) database = new Promise((resolve, reject) => {
-    const request = indexedDB.open('lumapet-light', 1);
+    const request = indexedDB.open('lumapet-light', 2);
     request.onupgradeneeded = () => {
-      request.result.createObjectStore('pets', { keyPath: 'id' });
-      request.result.createObjectStore('media');
+      if (!request.result.objectStoreNames.contains('pets')) request.result.createObjectStore('pets', { keyPath: 'id' });
+      if (!request.result.objectStoreNames.contains('media')) request.result.createObjectStore('media');
+      if (!request.result.objectStoreNames.contains('drafts')) request.result.createObjectStore('drafts');
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(new Error('浏览器无法保存角色，请检查存储空间或隐私设置。'));
@@ -22,6 +23,8 @@ async function transaction(stores, mode, operation) {
 }
 export const listPets = () => transaction(['pets'], 'readonly', tx => tx.objectStore('pets').getAll());
 export const getMedia = id => transaction(['media'], 'readonly', tx => tx.objectStore('media').get(id));
+export const getDraft = () => transaction(['drafts'], 'readonly', tx => tx.objectStore('drafts').get('current'));
+export const saveDraft = draft => transaction(['drafts'], 'readwrite', tx => tx.objectStore('drafts').put(draft, 'current'));
 export const savePet = (pet, media) => transaction(['pets', 'media'], 'readwrite', tx => {
   tx.objectStore('pets').put(pet);
   tx.objectStore('media').put(media, pet.id);
@@ -30,4 +33,3 @@ export const removePet = id => transaction(['pets', 'media'], 'readwrite', tx =>
   tx.objectStore('pets').delete(id);
   tx.objectStore('media').delete(id);
 });
-

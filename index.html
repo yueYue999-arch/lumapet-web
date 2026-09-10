@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#f5f4ed"><meta name="description" content="绒星轻量桌宠工作台：10种基础姿态，按需增加。在线选择、预览与导出，本机完成新图制作。">
+<meta name="theme-color" content="#edf3f4"><meta name="description" content="把照片做成自己的桌面伙伴。默认10张姿态，网页设定、本机生成，逐张预览后带到桌面。">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'">
 <meta name="referrer" content="no-referrer">
 <title>绒星 · 轻量桌宠工作台</title>
@@ -14,12 +14,13 @@
 <a class="skip-link" href="#main">跳到工作台</a>
 <header class="site-header">
 <a class="brand" href="#create" aria-label="绒星，回到制作台"><img src="./assets/icon.svg" alt="" width="36" height="36"><span>绒星<small>桌宠工作台</small></span></a>
-<nav aria-label="主导航"><a href="#create" data-tab="create" aria-current="page">制作</a><a href="#library" data-tab="library">我的角色 <span id="library-count">0</span></a></nav>
+<nav aria-label="主导航"><a href="#create" data-tab="create" aria-current="page">角色设定</a><a href="#make" data-tab="make">生成与交付</a><a href="#library" data-tab="library">我的角色 <span id="library-count">0</span></a><a href="#guide" data-tab="guide">使用指南</a></nav>
 <div class="header-end"><span id="mode-label">网页版</span><button id="settings-open" class="text-button" hidden>生成设置</button></div>
 </header>
 <main id="main">
 <section id="create-page" aria-labelledby="create-title">
-<div class="page-heading"><div><p class="eyebrow">一点点制作，慢慢陪伴</p><h1 id="create-title">从 10 张图，开始陪伴。</h1><p>基础姿态各一张，想要更多，再勾选。</p></div><button id="import-plan" class="secondary">导入制作单</button></div>
+<div class="page-heading"><div><h1 id="create-title">让熟悉的它，住进桌面。</h1><p>一张参考照片，10 种日常姿态。先设定，再制作。</p></div><button id="import-plan" class="secondary">导入制作单</button></div>
+<ol class="workflow-strip" aria-label="制作流程"><li aria-current="step"><span>1</span><div><strong>设定角色</strong><small>照片、风格与姿态</small></div></li><li><span>2</span><div><strong>本机生成</strong><small>连接电脑，查看真实进度</small></div></li><li><span>3</span><div><strong>检查与交付</strong><small>逐张预览，下载到桌面</small></div></li></ol>
 <div class="workbench">
 <form id="create-form" class="editor">
 <div class="section-label"><span>01</span><h2>它的样子</h2></div>
@@ -27,31 +28,52 @@
 <label id="reference-zone" class="upload-zone"><input id="reference-file" type="file" accept="image/png,image/jpeg,image/webp" aria-label="选择参考图"><img id="reference-preview" alt="已选择的参考图" hidden><span id="reference-hint"><b>＋</b><strong>放一张参考图</strong><small>PNG、JPG、WebP<br>不超过 20 MB</small></span></label>
 <div class="identity-text"><label for="pet-name">伙伴的名字</label><input id="pet-name" maxlength="40" placeholder="给它取个名字" required autocomplete="off">
 <fieldset class="kind-picker"><legend>角色类型</legend><label><input type="radio" name="kind" value="pet" checked>动物伙伴</label><label><input type="radio" name="kind" value="character">人物角色</label></fieldset>
-<label for="pet-style">想要的样子 <span class="muted">选填</span></label><textarea id="pet-style" maxlength="300" rows="2" placeholder="比如：保留花纹，柔软毛绒质感"></textarea></div>
+<label for="pet-style">想要的样子 <span class="muted">选填</span></label><textarea id="pet-style" maxlength="300" rows="2" placeholder="比如：保留花纹，柔软毛绒质感"></textarea><div class="style-suggestions" aria-label="风格建议"><button type="button" data-style="保留原图的颜色、花纹和配饰，柔软毛绒质感">毛绒伙伴</button><button type="button" data-style="保留原图的辨识特征，清晰的像素画风格">像素朋友</button><button type="button" data-style="保留原图的颜色和特征，圆润的手办质感">小小手办</button></div></div>
 </div>
+<p class="photo-tip">选一张主体完整、脸部清楚的照片，尽量避免遮挡与多人合照。</p>
 <div class="section-label pose-heading"><span>02</span><h2>选择姿态</h2><button id="reset-poses" class="text-button" type="button">恢复基础 10 张</button></div>
 <div id="basic-poses" class="pose-options" role="group" aria-label="基础姿态"></div>
 <details id="extra-poses"><summary>添加其他姿态 <span id="extra-count">按需勾选</span></summary><div id="optional-poses" class="pose-options" role="group" aria-label="可选姿态"></div></details>
-<div class="make-footer"><div><strong id="selected-count">10 张图</strong><span>每种姿态 1 张，走跑暂不制作</span></div><button id="create-button" class="primary" type="submit">导出制作单</button></div>
-<p id="creation-help" class="help">制作单带上参考图与所选姿态，导入本机工作台后生成。这里不上传照片。</p><p id="form-error" class="error" role="alert" hidden></p>
+<div class="make-footer"><div><strong id="selected-count">10 张图</strong><span>每种姿态 1 张，走跑暂不制作</span></div><button id="create-button" class="primary" type="submit">下一步：确认制作</button></div>
+<p id="creation-help" class="help">下一步会保存在此浏览器，并带你连接本机生成。照片不会上传到网站。</p><p id="form-error" class="error" role="alert" hidden></p>
 </form>
 <aside class="preview-card" aria-labelledby="preview-title">
 <div class="preview-heading"><h2 id="preview-title">看看它的样子</h2><span id="preview-badge" class="badge">示例</span></div>
+<div class="stage-tools" role="group" aria-label="预览背景"><span>检查背景</span><button data-background="light" aria-pressed="true">浅色</button><button data-background="dark" aria-pressed="false">深色</button><button data-background="clear" aria-pressed="false">透明格</button></div>
 <div id="stage" class="stage"><div class="stage-ground"></div><img id="pose-image" src="./assets/demo-idle.png" width="384" height="384" alt="小橘的基础姿态"><p id="pose-empty" hidden></p><span id="pose-label">轻轻呼吸</span></div>
 <div class="preview-bottom"><strong id="active-pet-name">小橘 · 示例</strong><span id="preview-count">10 种基础姿态</span></div>
 <div id="preview-poses" class="preview-poses" role="group" aria-label="预览姿态"></div>
 <div class="preview-actions"><button id="import-pet" class="secondary">导入角色包</button><button id="export-pet" class="primary">导出轻量角色包</button></div>
+<div class="preview-actions compact"><button id="export-image" class="text-button">下载当前 PNG</button><button id="export-sheet" class="text-button">下载姿态总览</button></div>
 <button id="show-desktop" class="text-button" hidden>邀请到桌面 ↗</button>
 <button id="add-poses" class="text-button" hidden></button>
 <p id="preview-help" class="help">预览是已有示例。你的新形象需要在本机完成制作。</p>
 </aside>
 </div>
-<section id="jobs-section" class="jobs-section" aria-labelledby="jobs-title" hidden><h2 id="jobs-title">本机制作进度</h2><div id="jobs-list"></div></section>
+<div class="delivery-note"><h2>完成后，你会得到什么？</h2><div><strong>透明 PNG</strong><p>每种姿态一张，可单独保存。</p></div><div><strong>桌宠角色包</strong><p>包含姿态和配置，导入桌宠即可使用。</p></div><div><strong>姿态总览</strong><p>把已完成的形态放在一起，方便检查和展示。</p></div></div>
+</section>
+<section id="make-page" aria-labelledby="make-title" hidden>
+<div class="page-heading"><div><h1 id="make-title">从照片，到你的伙伴。</h1><p>在这里接着制作，完成后取回全部姿态。</p></div><a class="secondary" href="#create">返回修改设定</a></div>
+<div id="make-empty" class="empty-state"><img src="./assets/demo-pat.png" alt="" width="160" height="160"><h2>先给伙伴一个模样</h2><p>放入照片并确认设定后，制作单和进度会出现在这里。</p><a href="#create" class="primary">去设定角色</a><button id="make-import-empty" class="secondary">导入已有制作单</button></div>
+<div id="make-content" hidden>
+<div class="make-layout"><aside class="order-summary"><img id="order-photo" alt="本次制作的参考图"><div><span class="badge">本次制作</span><h2 id="order-name"></h2><p id="order-kind"></p></div><p id="order-style"></p><dl><div><dt>姿态数量</dt><dd id="order-count"></dd></div><div><dt>成品格式</dt><dd>透明 PNG + 角色包</dd></div><div><dt>保存位置</dt><dd id="order-storage">此浏览器与本机</dd></div></dl><div id="order-poses" class="order-poses"></div><button id="download-plan" class="secondary">保存制作单备份</button><p class="help">制作单带有参考图。换电脑时导入即可继续，无需重新填写。</p></aside>
+<div class="production"><ol id="production-steps" class="production-steps"><li data-step="ready"><span>1</span><div><strong>资料准备好</strong><p>参考图、风格和所选姿态已保存在此浏览器。</p></div></li><li data-step="generate"><span>2</span><div><strong id="production-status">连接本机工作台</strong><p id="production-detail">打开电脑上的工作台，再把这份制作单送过去。</p><progress id="production-progress" aria-label="本次制作进度" hidden></progress></div></li><li data-step="result"><span>3</span><div><strong>取回成品</strong><p id="result-detail">制作完成后，角色包会回到此网页。可以逐张检查、下载或导入桌宠。</p></div></li></ol>
+<div id="local-setup" class="setup-panel"><h2>第一次使用？先打开本机工作台</h2><p>在 Windows 电脑上下载并完整解压，双击「打开角色工作台.cmd」。打开后回到本页连接。</p><a class="secondary client-download" href="https://github.com/yueYue999-arch/lumapet-web/releases/download/v1.6.0/LumaPet-1.6.0-win-x64.zip">下载 Windows 工作台 <small>约 196 MB</small></a><p class="help">生成需要这台电脑已登录 Codex CLI，或已配置图像 API。手机上可以准备制作单、预览和导出，生成时需使用电脑。</p></div>
+<div class="production-actions"><button id="connect-local" class="primary">连接本机并发送制作单</button><button id="local-start" class="primary" hidden>开始生成姿态</button><button id="flow-settings" class="secondary" hidden>设置生成服务</button><button id="result-open" class="primary" hidden>检查生成的角色</button><button id="result-import" class="secondary">导入已完成的角色包</button></div>
+<p id="connection-message" class="help" role="status"></p><p id="flow-error" class="error" role="alert" hidden></p>
+<details id="connection-help"><summary>连接不上，或想换一台电脑制作？</summary><ol class="plain-steps"><li>确认已完整解压新版工作台，并打开「打开角色工作台.cmd」。</li><li>允许本网站打开新标签页；保持这个网页和本机网页都开着。</li><li>也可以「保存制作单备份」，在本机点「导入制作单」。完成后导出 ZIP，回到这里导入。</li></ol><label for="local-address">本机工作台地址</label><input id="local-address" type="url" value="http://127.0.0.1:17654/" aria-describedby="local-address-help"><p id="local-address-help" class="help">通常无需修改；使用自定义端口时，填入本机工作台显示的地址。</p></details>
+</div></div>
+</div>
+<section id="jobs-section" class="jobs-section" aria-labelledby="jobs-title" hidden><h2 id="jobs-title">本机制作记录</h2><div id="jobs-list"></div></section>
 </section>
 <section id="library-page" aria-labelledby="library-title" hidden>
 <div class="page-heading"><div><p class="eyebrow">让陪伴有个小小的家</p><h1 id="library-title">我的角色</h1><p id="library-help">保存在此浏览器。导出角色包，方便换电脑继续使用。</p></div><button id="library-import" class="primary">导入角色包</button></div>
 <div id="library-grid" class="library-grid"></div>
 <div id="library-empty" class="empty-state"><img src="./assets/demo-idle.png" alt="" width="160" height="160"><h2>给你的伙伴留个位置</h2><p>导入本机制作好的角色包，就能在这里预览和导出。</p><a class="secondary" href="#create">回到制作台</a></div>
+</section>
+<section id="guide-page" aria-labelledby="guide-title" hidden><div class="page-heading"><div><h1 id="guide-title">带它回家的几件小事。</h1><p>从选照片到桌面陪伴，一次走清楚。</p></div><a href="#create" class="primary">开始设定角色</a></div>
+<div class="guide-layout"><article><h2>选图与风格</h2><p>使用单个主体、轮廓完整的照片。花纹、发型、衣服或配饰越清楚，越容易保留辨识特征。风格说明写你最想留下的特点即可。</p><h2>生成在哪里完成？</h2><p>网站负责设定、预览和导出。生成由你电脑上的工作台调用已配置的图像服务，照片会在开始生成时发送给该服务。网站不会借用此电脑的登录状态在云端生图。</p><h2>如何看进度？</h2><p>连接本机后，在打开的工作台确认并开始生成。回到「生成与交付」可看到实际步骤；出图期间没有虚假的倒计时。失败时保留制作要求，按错误提示修复后继续。</p><h2>到桌面后如何使用？</h2><p>生成完成，在本机点「邀请到桌面」。或先下载角色 ZIP，在桌宠工作台导入，再邀请到桌面。网页版的 PNG 和姿态总览也可以独立保存。</p></article><aside class="guide-aside"><img src="./assets/demo-sleep.png" alt="小橘的安静睡觉姿态" width="240" height="240"><h2>交付前，逐张看一眼</h2><ul><li>脸、花纹和配饰是否一致</li><li>深浅背景下是否有白边、缺角</li><li>每张姿态是否与名称相符</li><li>是否包含全部已选姿态</li></ul><p class="help">当前每种姿态是一张静态图，暂不制作走跑动画。</p></aside></div>
+<div class="faq"><h2>使用中常见的问题</h2><details><summary>为什么放了照片，右侧还是小橘？</summary><p>小橘用于演示输出效果。上传的照片是制作参考，真实的新形象会在本机生成完成后显示，不会用示例替代成品。</p></details><details><summary>我的资料会丢吗？</summary><p>确认制作后的资料与导入角色保存在当前浏览器。刷新可以继续；换设备不会自动同步。清除浏览器数据前，请保存制作单和角色 ZIP。</p></details><details><summary>连接断了，是否要重新生成？</summary><p>保持桌宠程序运行即可继续生成。重新连接时会读取同一任务的进度；已完成的角色仍在本机「我的角色」里，也可手动导出再导入网站。</p></details><details><summary>第一次生成需要什么？会产生费用吗？</summary><p>需要 Windows 工作台，以及本机可用的 Codex CLI 登录或图像 API。网站不收费；图像服务可能消耗你的订阅额度或 API 余额，以所选服务为准。</p></details><details><summary>还能增加其他姿态吗？</summary><p>可以。先打开已有角色，勾选额外姿态；在本机点击补充姿态，只生成尚未制作的部分。</p></details></div>
 </section>
 </main>
 <footer>绒星 <span>·</span> 少一点复杂，多一点陪伴</footer>
