@@ -7,8 +7,9 @@ const inProgress = job => job && ['submitting', 'queued', 'actions-generating', 
 const labels = { queued: '已送达，等待制作', 'actions-generating': '正在制作你的姿态', processing: '正在整理透明图片', packaging: '图片已完成，正在准备程序包', ready: '你的桌宠准备好了', failed: '制作暂未完成', interrupted: '制作已暂停', cancelled: '制作已取消', 'packaging-failed': '图片完成，程序包需要重试' };
 
 export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, notify }) {
-  let draft, endpoint, submitting = false, polling = false, timer, ready = false, importing = false, connecting = false, collecting = false;
-  const error = message => { $('flow-error').textContent = message || ''; $('flow-error').hidden = !message; };
+  let draft, endpoint, submitting = false, polling = false, timer, ready = false, importing = false, connecting = false, collecting = false, connectionTimer;
+  let connectionDetail = '确认后，照片和设定会发送到绒星工作室，由工作室电脑生成并打包。', errorSource;
+  const error = (message, source = 'flow') => { errorSource = source; $('flow-error').textContent = message || ''; $('flow-error').hidden = !message; };
   const persist = () => saveDraft(draft);
   const orderUrl = action => endpoint + '/visitor/orders/' + draft.receipt + (action ? '/' + action : '');
   const link = () => location.href.split('#')[0] + '#collect=' + draft.receipt;
@@ -50,7 +51,7 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
     $('remote-retry').hidden = !['failed', 'interrupted', 'cancelled', 'packaging-failed'].includes(job?.status);
     $('remote-delete').hidden = !job || inProgress(job);
     $('production-status').textContent = job ? labels[job.status] || '正在接收资料' : ready ? '工作室可以接单' : connecting ? '正在连接工作室' : '工作室暂未接单';
-    $('production-detail').textContent = job?.message || (job?.queueAhead ? `前面还有 ${job.queueAhead} 份制作，轮到后会自动开始。` : complete ? '程序已带上你的角色；可以先查看姿态，再下载到电脑。' : job ? '可以关闭网页，使用下方取件链接回来查看。进度按实际步骤更新。' : '确认后，照片和设定会发送到绒星工作室，由工作室电脑生成并打包。');
+    $('production-detail').textContent = job?.message || (job?.queueAhead ? `前面还有 ${job.queueAhead} 份制作，轮到后会自动开始。` : complete ? '程序已带上你的角色；可以先查看姿态，再下载到电脑。' : job ? '可以关闭网页，使用下方取件链接回来查看。进度按实际步骤更新。' : connectionDetail);
     const progress = $('production-progress'); progress.hidden = !inProgress(job);
     progress.max = plan.actionIds.length; progress.value = job?.progress?.done || 0;
     $('result-detail').textContent = complete ? '完整解压后双击“启动桌宠.exe”，无需安装或导入角色。' : '这里将提供专属 Windows 程序包、透明姿态图片和预览。';
@@ -58,7 +59,12 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
     $('production-steps').querySelector('[data-step=generate]').dataset.state = complete ? 'done' : 'active';
     $('production-steps').querySelector('[data-step=result]').dataset.state = complete ? 'done' : 'waiting';
   }
-  async function availability() {
+  function scheduleAvailability() {
+    clearTimeout(connectionTimer);
+    if (!document.hidden && (!draft?.receipt || location.hash.startsWith('#collect='))) connectionTimer = setTimeout(reconnect, 15000);
+  }
+  async function availability({ silent = false } = {}) {
+    if (connecting) return;
     connecting = true; render();
     try {
       if (!endpoint) {
@@ -69,10 +75,25 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
       }
       const status = await request(endpoint + '/visitor/status'); ready = status.accepting;
       $('service-status').textContent = ready ? '工作室在线 · 可提交测试' : status.online ? '工作室暂忙 · 请稍后提交' : '工作室离线 · 请稍后提交';
-      error('');
-    } catch (cause) { ready = false; $('service-status').textContent = '工作室暂未连接'; error('暂时连不上工作室，资料仍在此浏览器。稍后点“重新检查连接”即可继续。'); }
-    finally { connecting = false; render(); }
+      connectionDetail = ready ? '工作室已连接。确认后即可发送照片和设定，生成与打包由工作室完成。' : status.online ? '工作室已连接，当前队列或生图服务暂不可用。资料已保留，页面会自动重新检查。' : '工作室制作电脑暂未在线。资料已保留，页面会自动重新检查；你无需安装本机工作台。';
+      if (!silent || errorSource === 'connection') error('');
+    } catch (cause) {
+      ready = false; $('service-status').textContent = '暂时无法连接工作室';
+      connectionDetail = '当前网络暂时无法访问工作室。资料已保留，恢复联网后会重新连接。';
+      if (!silent || errorSource === 'connection') error('暂时连不上工作室，资料仍在此浏览器。页面会自动重连，也可点“重新检查连接”。', 'connection');
+    }
+    finally { connecting = false; render(); scheduleAvailability(); }
   }
+  const reconnect = async () => {
+    if (document.hidden) return;
+    await availability({ silent: true });
+    if (endpoint && location.hash.startsWith('#collect=')) {
+      try { await collect(); } catch (cause) { error(cause.message, 'connection'); }
+    } else if (draft?.receipt) refresh();
+  };
+  window.addEventListener('online', reconnect);
+  window.addEventListener('focus', reconnect);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(connectionTimer); else reconnect(); });
   async function collect() {
     const collection = location.hash.match(/^#collect=([a-f0-9]{64})$/);
     if (!collection || collecting) return false;
@@ -152,6 +173,7 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
       if (inProgress(draft?.remote)) throw new Error('当前角色正在制作，请先在“生成与交付”查看进度。');
       if (plan.actionIds.length > 20) throw new Error('测试阶段最多制作 20 张姿态，请减少额外动作。');
       draft = { plan: validatePlan(plan, ACTIONS), delivery: 'studio' }; await persist(); error(''); render(); location.hash = 'make'; $('make-title').focus({ preventScroll: true });
+      await availability();
     },
     async init() {
       try {
@@ -166,9 +188,9 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
         $('service-status').textContent = '工作室暂未连接';
         // A network failure must not hide the browser's saved photos/receipt.
         if (!draft) { const saved = await getDraft(); if (saved?.plan) { draft = saved; await loadPlan(saved.plan); } }
-        error(cause.message);
+        error(cause.message, 'connection');
       }
-      render();
+      render(); scheduleAvailability();
     }
   };
 }
