@@ -3,6 +3,7 @@ import { MOVEMENT, firstFrame, selectedActions, validatePlan, readPetArchive } f
 import { listPets, getMedia, savePet, removePet } from './storage.js';
 import { exportArchive, exportSingle, exportSheet } from './exports.js';
 import { createWorkflow } from './workflow.js';
+import { createRemoteWorkflow } from './remote-workflow.js';
 
 const $ = id => document.getElementById(id);
 const local = document.querySelector('meta[name="luma-runtime"]')?.content === 'local';
@@ -332,7 +333,7 @@ $('settings-form').addEventListener('submit', event => {
 $('pose-image').addEventListener('error', () => { $('pose-image').hidden = true; $('pose-empty').hidden = false; $('pose-empty').textContent = '这张图片未能读取，请重新导入角色包。'; });
 $('preview-title').tabIndex = -1;
 document.querySelectorAll('main h1').forEach(heading => { heading.tabIndex = -1; });
-workflow = createWorkflow({ local, api, state: () => state, loadPlan, importPet, openPet, notify });
+workflow = (local ? createWorkflow : createRemoteWorkflow)({ local, api, state: () => state, loadPlan, importPet, openPet, notify });
 renderChoices(); route();
 if (local) {
   $('mode-label').textContent = '本机工作台'; $('settings-open').hidden = false;
