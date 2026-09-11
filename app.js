@@ -109,7 +109,7 @@ function renderPreview() {
   const missing = selectedList().filter(action => !activePet.actions.some(item => item.id === action.id));
   $('preview-count').textContent = available.length + ' 张可导出' + (missing.length ? ' · ' + missing.length + ' 张待制作' : '');
   $('export-pet').textContent = activePet.id === 'demo' ? '下载示例角色包' : '导出轻量角色包';
-  $('preview-help').textContent = activePet.id === 'demo' ? '这是小橘示例，可直接导出体验。你的新形象需要在本机完成制作。' : missing.length ? '虚线姿态尚未制作。导出只包含已完成的 ' + available.length + ' 张图。' : '每种姿态导出一张静态 PNG。导入的动画包在这里使用首帧。';
+  $('preview-help').textContent = activePet.id === 'demo' ? (local ? '这是小橘示例，可直接导出体验。你的新形象需要在本机完成制作。' : '这是小橘示例，可直接导出体验。提交照片后，工作室会制作你的专属角色。') : missing.length ? '虚线姿态尚未制作。导出只包含已完成的 ' + available.length + ' 张图。' : '每种姿态导出一张静态 PNG。导入的动画包在这里使用首帧。';
   $('show-desktop').hidden = !local || !state.desktop.connected || activePet.id === 'demo';
   $('add-poses').hidden = !local || activePet.id === 'demo' || !missing.length;
   $('add-poses').textContent = '在本机补充这 ' + missing.length + ' 张姿态';
