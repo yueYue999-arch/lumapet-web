@@ -7,7 +7,7 @@ const inProgress = job => job && ['submitting', 'queued', 'actions-generating', 
 const labels = { queued: '已送达，等待制作', 'actions-generating': '正在制作你的姿态', processing: '正在整理透明图片', packaging: '图片已完成，正在准备程序包', ready: '你的桌宠准备好了', failed: '制作暂未完成', interrupted: '制作已暂停', cancelled: '制作已取消', 'packaging-failed': '图片完成，程序包需要重试' };
 
 export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, notify }) {
-  let draft, endpoint, submitting = false, polling = false, timer, ready = false, importing = false;
+  let draft, endpoint, submitting = false, polling = false, timer, ready = false, importing = false, connecting = false, collecting = false;
   const error = message => { $('flow-error').textContent = message || ''; $('flow-error').hidden = !message; };
   const persist = () => saveDraft(draft);
   const orderUrl = action => endpoint + '/visitor/orders/' + draft.receipt + (action ? '/' + action : '');
@@ -31,7 +31,8 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
     $('order-poses').textContent = plan.actionIds.map(id => ACTIONS.find(action => action.id === id)?.label).join('、');
     $('remote-send').hidden = !!job; $('remote-send').disabled = submitting || !ready;
     $('remote-send').textContent = submitting ? '正在发送照片…' : '提交给工作室制作';
-    $('remote-consent-row').hidden = !!job; $('remote-refresh').hidden = !draft.receipt;
+    $('remote-consent-row').hidden = !!job; $('remote-refresh').hidden = false;
+    $('remote-refresh').textContent = draft.receipt ? '刷新进度' : '重新检查连接'; $('remote-refresh').disabled = connecting || polling;
     $('remote-receipt').hidden = !draft.receipt;
     if (draft.receipt) $('receipt-link').value = link();
     const complete = job?.status === 'ready';
@@ -48,7 +49,7 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
     }
     $('remote-retry').hidden = !['failed', 'interrupted', 'cancelled', 'packaging-failed'].includes(job?.status);
     $('remote-delete').hidden = !job || inProgress(job);
-    $('production-status').textContent = job ? labels[job.status] || '正在接收资料' : ready ? '工作室可以接单' : '正在连接工作室';
+    $('production-status').textContent = job ? labels[job.status] || '正在接收资料' : ready ? '工作室可以接单' : connecting ? '正在连接工作室' : '工作室暂未接单';
     $('production-detail').textContent = job?.message || (job?.queueAhead ? `前面还有 ${job.queueAhead} 份制作，轮到后会自动开始。` : complete ? '程序已带上你的角色；可以先查看姿态，再下载到电脑。' : job ? '可以关闭网页，使用下方取件链接回来查看。进度按实际步骤更新。' : '确认后，照片和设定会发送到绒星工作室，由工作室电脑生成并打包。');
     const progress = $('production-progress'); progress.hidden = !inProgress(job);
     progress.max = plan.actionIds.length; progress.value = job?.progress?.done || 0;
@@ -57,6 +58,35 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
     $('production-steps').querySelector('[data-step=generate]').dataset.state = complete ? 'done' : 'active';
     $('production-steps').querySelector('[data-step=result]').dataset.state = complete ? 'done' : 'waiting';
   }
+  async function availability() {
+    connecting = true; render();
+    try {
+      if (!endpoint) {
+        const config = await request('./service.json');
+        const parsed = new URL(config.url || location.origin);
+        if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) throw new Error('工作室连接配置无效');
+        endpoint = parsed.origin;
+      }
+      const status = await request(endpoint + '/visitor/status'); ready = status.accepting;
+      $('service-status').textContent = ready ? '工作室在线 · 可提交测试' : status.online ? '工作室暂忙 · 请稍后提交' : '工作室离线 · 请稍后提交';
+      error('');
+    } catch (cause) { ready = false; $('service-status').textContent = '工作室暂未连接'; error('暂时连不上工作室，资料仍在此浏览器。稍后点“重新检查连接”即可继续。'); }
+    finally { connecting = false; render(); }
+  }
+  async function collect() {
+    const collection = location.hash.match(/^#collect=([a-f0-9]{64})$/);
+    if (!collection || collecting) return false;
+    collecting = true;
+    try {
+      const result = await request(endpoint + '/visitor/orders/' + collection[1] + '?includePlan=1');
+      if (location.hash !== collection[0]) return true;
+      const { plan, ...job } = result;
+      draft = { plan: validatePlan(plan, ACTIONS), receipt: collection[1], remote: job, delivery: 'studio' };
+      await persist(); await loadPlan(draft.plan); error(''); render(); location.hash = 'make'; refresh();
+      return true;
+    } finally { collecting = false; }
+  }
+  window.addEventListener('hashchange', () => { if (endpoint && location.hash.startsWith('#collect=')) collect().catch(cause => { error(cause.message); location.hash = 'make'; }); });
   async function refresh() {
     if (!draft?.receipt || endpoint === undefined || polling) return;
     polling = true; const receipt = draft.receipt;
@@ -65,7 +95,7 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
       if (draft.receipt !== receipt) return;
       const { plan, ...job } = result; draft.remote = job; await persist(); error(''); render();
     } catch (cause) { error(cause.message); }
-    finally { polling = false; clearTimeout(timer); if (inProgress(draft?.remote)) timer = setTimeout(refresh, 6000); }
+    finally { polling = false; render(); clearTimeout(timer); if (inProgress(draft?.remote)) timer = setTimeout(refresh, 6000); }
   }
   async function submit() {
     if (submitting || !draft || !ready || draft.remote) return;
@@ -74,13 +104,18 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
     try {
       draft.receipt ||= [...crypto.getRandomValues(new Uint8Array(32))].map(n => n.toString(16).padStart(2, '0')).join('');
       await persist(); render();
-      draft.remote = await request(orderUrl(), { plan: draft.plan, consent: true });
+      const photo = new Image(); photo.src = draft.plan.reference.dataUrl; await photo.decode();
+      const ratio = Math.min(1, 1280 / Math.max(photo.naturalWidth, photo.naturalHeight));
+      const canvas = document.createElement('canvas'); canvas.width = Math.round(photo.naturalWidth * ratio); canvas.height = Math.round(photo.naturalHeight * ratio);
+      const paint = canvas.getContext('2d'); paint.fillStyle = '#ffffff'; paint.fillRect(0, 0, canvas.width, canvas.height); paint.drawImage(photo, 0, 0, canvas.width, canvas.height);
+      const plan = { ...draft.plan, reference: { name: '参考图.jpg', dataUrl: canvas.toDataURL('image/jpeg', .9) } };
+      draft.remote = await request(orderUrl(), { plan, consent: true });
       await persist(); render(); notify('照片已送达工作室。请保存取件链接。'); refresh();
     } catch (cause) { error(cause.message); }
     finally { submitting = false; render(); }
   }
   $('remote-send').addEventListener('click', submit);
-  $('remote-refresh').addEventListener('click', refresh);
+  $('remote-refresh').addEventListener('click', async () => { await availability(); if (draft?.receipt) await refresh(); });
   $('remote-retry').addEventListener('click', async () => {
     $('remote-retry').disabled = true;
     try { draft.remote = await request(orderUrl('retry'), {}); await persist(); render(); refresh(); } catch (cause) { error(cause.message); }
@@ -108,7 +143,7 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
   });
   $('remote-delete').addEventListener('click', async () => {
     if (!confirm('删除工作室中这份任务的照片与成品？取件链接将失效。已下载到你电脑的文件会保留。')) return;
-    try { await request(orderUrl(), undefined, 'DELETE'); draft = null; await persist(); render(); notify('本次任务的照片与成品已从工作室删除。'); }
+    try { await request(orderUrl(), undefined, 'DELETE'); draft = null; await persist(); render(); notify('云端照片与成品已删除，工作室电脑将在下次连接时同步清理。'); }
     catch (cause) { error(cause.message); }
   });
   return {
@@ -124,14 +159,8 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
         endpoint = config.url || location.origin;
         const parsed = new URL(endpoint); if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) throw new Error('工作室连接配置无效');
         endpoint = parsed.origin;
-        const collection = location.hash.match(/^#collect=([a-f0-9]{64})$/);
-        if (collection) {
-          const result = await request(endpoint + '/visitor/orders/' + collection[1]);
-          const { plan, ...job } = result; draft = { plan: validatePlan(plan, ACTIONS), receipt: collection[1], remote: job, delivery: 'studio' }; await persist(); location.hash = 'make';
-        } else { const saved = await getDraft(); if (saved?.plan) draft = { ...saved, plan: validatePlan(saved.plan, ACTIONS) }; }
-        if (draft) await loadPlan(draft.plan);
-        const status = await request(endpoint + '/visitor/status'); ready = status.accepting;
-        $('service-status').textContent = ready ? '工作室在线 · 可提交测试' : '工作室暂忙 · 请稍后提交';
+        if (!await collect()) { const saved = await getDraft(); if (saved?.plan) { draft = { ...saved, plan: validatePlan(saved.plan, ACTIONS) }; await loadPlan(draft.plan); } }
+        await availability();
         if (draft?.receipt) refresh();
       } catch (cause) {
         $('service-status').textContent = '工作室暂未连接';

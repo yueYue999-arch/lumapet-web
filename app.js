@@ -79,13 +79,14 @@ async function loadPlan(plan) {
   selected = new Set(plan.actionIds); renderChoices(); showError('form-error');
 }
 function renderChoices() {
+  if (!local) for (const id of DEFAULT_ACTION_IDS) selected.add(id);
   for (const [target, actions] of [
     ['basic-poses', DEFAULT_ACTION_IDS.map(id => ACTIONS.find(action => action.id === id))],
     ['optional-poses', currentCatalog().filter(action => !DEFAULT_ACTION_IDS.includes(action.id))]
   ]) {
     $(target).replaceChildren(...actions.map(action => {
       const label = el('label', 'pose-option'), input = document.createElement('input');
-      input.type = 'checkbox'; input.value = action.id; input.checked = selected.has(action.id); input.disabled = action.id === 'idle';
+      input.type = 'checkbox'; input.value = action.id; input.checked = selected.has(action.id); input.disabled = action.id === 'idle' || (!local && DEFAULT_ACTION_IDS.includes(action.id));
       input.addEventListener('change', () => { input.checked ? selected.add(action.id) : selected.delete(action.id); updateSelection(); });
       label.append(input, el('span', '', action.label));
       if (action.id === 'idle') label.append(el('small', '', '必选'));
