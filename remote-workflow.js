@@ -38,23 +38,31 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
     if (draft.receipt) $('receipt-link').value = link();
     const complete = job?.status === 'ready';
     $('windows-download').hidden = !complete; $('poses-download').hidden = !complete;
+    $('android-download').hidden = !complete || !job.androidBytes;
+    $('phone-open').hidden = !complete;
     $('windows-help').hidden = !complete;
+    $('android-help').hidden = !complete || !job.androidBytes;
     if (complete) {
       $('windows-download').href = orderUrl('windows'); $('poses-download').href = orderUrl('poses');
       $('windows-download').textContent = '下载我的 Windows 桌宠 · ' + Math.round(job.bytes / 1024 / 1024) + ' MB';
+      $('android-download').href = orderUrl('android');
+      $('android-download').textContent = '下载 Android 桌宠 · ' + Math.round(job.androidBytes / 1024 / 1024) + ' MB';
+      $('phone-open').href = './phone.html#collect=' + draft.receipt;
     }
     $('result-open').hidden = !complete; $('result-open').textContent = importing ? '正在载入预览…' : '检查全部姿态'; $('result-open').disabled = importing;
     if (complete) {
       const downloads = $('windows-download').parentElement;
       $('production-steps').after(downloads); downloads.prepend($('result-open'));
+      if (/Android/i.test(navigator.userAgent) && job.androidBytes) downloads.prepend($('android-download'));
     }
-    $('remote-retry').hidden = !['failed', 'interrupted', 'cancelled', 'packaging-failed'].includes(job?.status);
+    $('remote-retry').hidden = !['failed', 'interrupted', 'cancelled', 'packaging-failed'].includes(job?.status) && !(complete && !job.androidBytes);
+    $('remote-retry').textContent = complete ? '补齐 Android 安装包' : '继续制作 / 重新打包';
     $('remote-delete').hidden = !job || inProgress(job);
     $('production-status').textContent = job ? labels[job.status] || '正在接收资料' : ready ? '工作室可以接单' : connecting ? '正在连接工作室' : '工作室暂未接单';
     $('production-detail').textContent = job?.message || (job?.queueAhead ? `前面还有 ${job.queueAhead} 份制作，轮到后会自动开始。` : complete ? '程序已带上你的角色；可以先查看姿态，再下载到电脑。' : job ? '可以关闭网页，使用下方取件链接回来查看。进度按实际步骤更新。' : connectionDetail);
     const progress = $('production-progress'); progress.hidden = !inProgress(job);
     progress.max = plan.actionIds.length; progress.value = job?.progress?.done || 0;
-    $('result-detail').textContent = complete ? '完整解压后双击“启动桌宠.exe”，无需安装或导入角色。' : '这里将提供专属 Windows 程序包、透明姿态图片和预览。';
+    $('result-detail').textContent = complete ? '按设备下载，角色已装进程序。也可以直接打开手机网页陪伴。' : '这里将提供 Windows 桌宠、Android 安装包、透明姿态图片和预览。';
     $('production-steps').querySelector('[data-step=ready]').dataset.state = 'done';
     $('production-steps').querySelector('[data-step=generate]').dataset.state = complete ? 'done' : 'active';
     $('production-steps').querySelector('[data-step=result]').dataset.state = complete ? 'done' : 'waiting';

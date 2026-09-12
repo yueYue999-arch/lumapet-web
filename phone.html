@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#edf3f4"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="referrer" content="no-referrer"><link rel="manifest" href="./phone.webmanifest"><link rel="apple-touch-icon" href="./assets/phone-192.png"><link rel="stylesheet" href="./phone.css"><title>绒星 · 手机陪伴</title></head>
+<body><main><header><a href="./index.html">绒星工作台</a><button id="install" class="text-button">添加到主屏幕</button></header>
+<h1 id="name">把伙伴带在身边</h1><p id="status" role="status">正在读取你的角色…</p>
+<section id="room" aria-label="伙伴的小房间"><button id="pet" aria-label="轻点摸头，可拖动或用方向键移动" disabled><img id="image" alt="" draggable="false"></button><p id="pose-label"></p></section>
+<div class="controls"><button id="pat" disabled>摸摸头</button><button id="sleep" disabled>睡觉</button><button id="eat" disabled>吃点东西</button></div>
+<label for="poses">换个姿态</label><select id="poses" disabled></select>
+<div id="install-help" class="note" hidden><strong>从主屏幕再次打开</strong><p id="install-detail"></p><p>网页陪伴显示在自己的页面中，不能悬浮到其他 App 上。Android 如需悬浮桌宠，请返回取件页下载安装包。</p></div>
+<p class="help">轻点互动，拖动或用方向键移动。角色保存完成后，可在这里离线陪伴。网页陪伴不会显示在其他应用上方。</p>
+<div class="bottom"><label class="file-button">导入已有姿态包<input id="import" type="file" accept=".zip,application/zip"></label><button id="forget" class="text-button" hidden>移除此设备的角色</button></div>
+<p id="error" role="alert" hidden></p></main><script type="module" src="./phone.js"></script></body></html>
