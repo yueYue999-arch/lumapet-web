@@ -1,4 +1,4 @@
-import { unzipSync, zipSync, strFromU8, strToU8 } from './vendor/fflate.js?v=1.8.0';
+import { unzipSync, zipSync, strFromU8, strToU8 } from './vendor/fflate.js?v=1.8.1';
 
 export const MOVEMENT = new Set(['walk', 'walk_right', 'run', 'run_right']);
 const MB = 1024 * 1024;

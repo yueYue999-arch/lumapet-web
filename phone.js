@@ -1,4 +1,4 @@
-import {readPetArchive} from './core.js?v=1.8.0';
+import {readPetArchive} from './core.js?v=1.8.1';
 const $=id=>document.getElementById(id);
 let record,urls={},pose='idle',reset,installPrompt,offset={x:0,y:0};
 const failure=message=>{$('error').textContent=message||'';$('error').hidden=!message;};
@@ -31,5 +31,5 @@ try{
   const previous=await stored();const token=location.hash.match(/^#collect=([a-f0-9]{64})$/)?.[1];
   if(token){if(previous?.receipt===token)render(previous);else render(null);$('status').textContent='正在取回专属姿态…';const config=await(await fetch('./service.json')).json();const endpoint=new URL(config.url||location.origin).origin;const response=await fetch(endpoint+'/visitor/orders/'+token+'/poses',{signal:AbortSignal.timeout(30000),cache:'no-store'});if(!response.ok)throw new Error('角色暂未取回，请等制作完成后从原取件页重新打开。');await importBytes(new Uint8Array(await response.arrayBuffer()),token);}
   else render(previous);
-  if('serviceWorker'in navigator){await navigator.serviceWorker.register('./phone-sw.js?v=1.8.0');await navigator.serviceWorker.ready;}
+  if('serviceWorker'in navigator){await navigator.serviceWorker.register('./phone-sw.js?v=1.8.1');await navigator.serviceWorker.ready;}
 }catch(error){failure(error.message);$('status').textContent=record?'已显示此设备保存的角色；当前联网取件未完成。':'尚未载入角色，可以导入已有姿态包或从取件页重试。';}

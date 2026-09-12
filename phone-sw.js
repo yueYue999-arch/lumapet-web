@@ -1,4 +1,4 @@
-const VERSION='1.8.0';
+const VERSION='1.8.1';
 const CACHE='lumapet-phone-'+VERSION;
 const STATIC=['phone.html','phone.css','phone.js','phone.webmanifest','core.js','vendor/fflate.js','assets/phone-192.png','assets/phone-512.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(STATIC.map(file=>file+'?v='+VERSION))).then(()=>self.skipWaiting())));

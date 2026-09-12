@@ -1,9 +1,9 @@
-import { ACTIONS, DEFAULT_ACTION_IDS, DEMO } from './catalog.js?v=1.8.0';
-import { MOVEMENT, firstFrame, selectedActions, validatePlan, readPetArchive } from './core.js?v=1.8.0';
-import { listPets, getMedia, savePet, removePet } from './storage.js?v=1.8.0';
-import { exportArchive, exportSingle, exportSheet } from './exports.js?v=1.8.0';
-import { createWorkflow } from './workflow.js?v=1.8.0';
-import { createRemoteWorkflow } from './remote-workflow.js?v=1.8.0';
+import { ACTIONS, DEFAULT_ACTION_IDS, DEMO } from './catalog.js?v=1.8.1';
+import { MOVEMENT, firstFrame, selectedActions, validatePlan, readPetArchive } from './core.js?v=1.8.1';
+import { listPets, getMedia, savePet, removePet } from './storage.js?v=1.8.1';
+import { exportArchive, exportSingle, exportSheet } from './exports.js?v=1.8.1';
+import { createWorkflow } from './workflow.js?v=1.8.1';
+import { createRemoteWorkflow } from './remote-workflow.js?v=1.8.1';
 
 const $ = id => document.getElementById(id);
 const local = document.querySelector('meta[name="luma-runtime"]')?.content === 'local';
@@ -303,7 +303,7 @@ $('add-poses').addEventListener('click', () => busy($('add-poses'), async () => 
   openedJobId = job.id; await refresh(); notify('正在补充 ' + missing.length + ' 张姿态。');
 }));
 function route(event) {
-  const target = ['create', 'make', 'library', 'guide'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'create';
+  const target = /^#collect=[a-f0-9]{64}$/.test(location.hash) ? 'make' : ['create', 'make', 'library', 'guide'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'create';
   for (const page of ['create', 'make', 'library', 'guide']) $(page + '-page').hidden = target !== page;
   document.querySelectorAll('[data-tab]').forEach(link => {
     if (link.dataset.tab === target) link.setAttribute('aria-current', 'page');

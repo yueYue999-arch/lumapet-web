@@ -1,7 +1,7 @@
-import { ACTIONS } from './catalog.js?v=1.8.0';
-import { validatePlan } from './core.js?v=1.8.0';
-import { getDraft, saveDraft } from './storage.js?v=1.8.0';
-import { download, safeName } from './exports.js?v=1.8.0';
+import { ACTIONS } from './catalog.js?v=1.8.1';
+import { validatePlan } from './core.js?v=1.8.1';
+import { getDraft, saveDraft } from './storage.js?v=1.8.1';
+import { download, safeName } from './exports.js?v=1.8.1';
 const $ = id => document.getElementById(id);
 const inProgress = job => job && ['submitting', 'queued', 'actions-generating', 'processing', 'packaging'].includes(job.status);
 const labels = { queued: '已送达，等待制作', 'actions-generating': '正在制作你的姿态', processing: '正在整理透明图片', packaging: '图片已完成，正在准备程序包', ready: '你的桌宠准备好了', failed: '制作暂未完成', interrupted: '制作已暂停', cancelled: '制作已取消', 'packaging-failed': '图片完成，程序包需要重试' };
@@ -20,6 +20,11 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
     const result = await response.json(); if (!response.ok) throw new Error(result.error || '请求未完成，请稍后重试。'); return result;
   };
   function render() {
+    const retrieving = /^#collect=[a-f0-9]{64}$/.test(location.hash);
+    $('make-empty').querySelector('h2').textContent = retrieving ? '正在取回你的伙伴' : '先给伙伴一个模样';
+    $('make-empty').querySelector('p').textContent = retrieving ? '取件链接已保留。网络恢复后会自动继续，无需重新上传照片。' : '放入照片并确认设定后，制作单和进度会出现在这里。';
+    $('make-empty').querySelector('a').hidden = retrieving; $('make-import-empty').hidden = retrieving;
+    $('make-empty').after($('flow-error'));
     $('make-empty').hidden = !!draft; $('make-content').hidden = !draft;
     $('remote-production').hidden = !draft;
     for (const id of ['local-setup', 'connect-local', 'local-start', 'flow-settings', 'connection-help', 'result-import']) $(id).hidden = true;
@@ -106,6 +111,7 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
     const collection = location.hash.match(/^#collect=([a-f0-9]{64})$/);
     if (!collection || collecting) return false;
     collecting = true;
+    if (draft && draft.receipt !== collection[1]) { draft = undefined; render(); }
     try {
       const result = await request(endpoint + '/visitor/orders/' + collection[1] + '?includePlan=1');
       if (location.hash !== collection[0]) return true;
@@ -115,13 +121,13 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
       return true;
     } finally { collecting = false; }
   }
-  window.addEventListener('hashchange', () => { if (endpoint && location.hash.startsWith('#collect=')) collect().catch(cause => { error(cause.message); location.hash = 'make'; }); });
+  window.addEventListener('hashchange', () => { if (endpoint && location.hash.startsWith('#collect=')) collect().catch(cause => { error(cause.message, 'connection'); scheduleAvailability(); }); });
   async function refresh() {
     if (!draft?.receipt || endpoint === undefined || polling) return;
     polling = true; const receipt = draft.receipt;
     try {
       const result = await request(orderUrl());
-      if (draft.receipt !== receipt) return;
+      if (draft?.receipt !== receipt) return;
       const { plan, ...job } = result; draft.remote = job; await persist(); error(''); render();
     } catch (cause) { error(cause.message); }
     finally { polling = false; render(); clearTimeout(timer); if (inProgress(draft?.remote)) timer = setTimeout(refresh, 6000); }
@@ -184,6 +190,7 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
       await availability();
     },
     async init() {
+      render();
       try {
         const config = await request('./service.json');
         endpoint = config.url || location.origin;
@@ -195,7 +202,10 @@ export function createRemoteWorkflow({ state, loadPlan, importPet, openPet, noti
       } catch (cause) {
         $('service-status').textContent = '工作室暂未连接';
         // A network failure must not hide the browser's saved photos/receipt.
-        if (!draft) { const saved = await getDraft(); if (saved?.plan) { draft = saved; await loadPlan(saved.plan); } }
+        if (!draft) {
+          const saved = await getDraft(), requested = location.hash.match(/^#collect=([a-f0-9]{64})$/)?.[1];
+          if (saved?.plan && (!requested || saved.receipt === requested)) { draft = saved; await loadPlan(saved.plan); }
+        }
         error(cause.message, 'connection');
       }
       render(); scheduleAvailability();
