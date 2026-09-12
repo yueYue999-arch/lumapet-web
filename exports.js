@@ -1,4 +1,4 @@
-import { firstFrame, makePetArchive } from './core.js';
+import { firstFrame, makePetArchive } from './core.js?v=1.8.0';
 
 export const safeName = name => name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 60) || '绒星角色';
 export function download(bytes, name, type) {

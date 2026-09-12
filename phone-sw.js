@@ -1,6 +1,7 @@
-const CACHE='lumapet-phone-v1';
+const VERSION='1.8.0';
+const CACHE='lumapet-phone-'+VERSION;
 const STATIC=['phone.html','phone.css','phone.js','phone.webmanifest','core.js','vendor/fflate.js','assets/phone-192.png','assets/phone-512.png'];
-self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(STATIC)).then(()=>self.skipWaiting())));
+self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(STATIC.map(file=>file+'?v='+VERSION))).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('lumapet-phone-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
   const url=new URL(event.request.url),base=new URL('./',self.location.href);

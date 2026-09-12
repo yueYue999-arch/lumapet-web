@@ -1,9 +1,9 @@
-import { ACTIONS, DEFAULT_ACTION_IDS, DEMO } from './catalog.js';
-import { MOVEMENT, firstFrame, selectedActions, validatePlan, readPetArchive } from './core.js';
-import { listPets, getMedia, savePet, removePet } from './storage.js';
-import { exportArchive, exportSingle, exportSheet } from './exports.js';
-import { createWorkflow } from './workflow.js';
-import { createRemoteWorkflow } from './remote-workflow.js';
+import { ACTIONS, DEFAULT_ACTION_IDS, DEMO } from './catalog.js?v=1.8.0';
+import { MOVEMENT, firstFrame, selectedActions, validatePlan, readPetArchive } from './core.js?v=1.8.0';
+import { listPets, getMedia, savePet, removePet } from './storage.js?v=1.8.0';
+import { exportArchive, exportSingle, exportSheet } from './exports.js?v=1.8.0';
+import { createWorkflow } from './workflow.js?v=1.8.0';
+import { createRemoteWorkflow } from './remote-workflow.js?v=1.8.0';
 
 const $ = id => document.getElementById(id);
 const local = document.querySelector('meta[name="luma-runtime"]')?.content === 'local';

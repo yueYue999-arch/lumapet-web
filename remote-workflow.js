@@ -1,7 +1,7 @@
-import { ACTIONS } from './catalog.js';
-import { validatePlan } from './core.js';
-import { getDraft, saveDraft } from './storage.js';
-import { download, safeName } from './exports.js';
+import { ACTIONS } from './catalog.js?v=1.8.0';
+import { validatePlan } from './core.js?v=1.8.0';
+import { getDraft, saveDraft } from './storage.js?v=1.8.0';
+import { download, safeName } from './exports.js?v=1.8.0';
 const $ = id => document.getElementById(id);
 const inProgress = job => job && ['submitting', 'queued', 'actions-generating', 'processing', 'packaging'].includes(job.status);
 const labels = { queued: '已送达，等待制作', 'actions-generating': '正在制作你的姿态', processing: '正在整理透明图片', packaging: '图片已完成，正在准备程序包', ready: '你的桌宠准备好了', failed: '制作暂未完成', interrupted: '制作已暂停', cancelled: '制作已取消', 'packaging-failed': '图片完成，程序包需要重试' };

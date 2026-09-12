@@ -1,8 +1,8 @@
-import { ACTIONS } from './catalog.js';
-import { validatePlan } from './core.js';
-import { getDraft, saveDraft } from './storage.js';
-import { download, safeName } from './exports.js';
-import { createBridge } from './bridge.js';
+import { ACTIONS } from './catalog.js?v=1.8.0';
+import { validatePlan } from './core.js?v=1.8.0';
+import { getDraft, saveDraft } from './storage.js?v=1.8.0';
+import { download, safeName } from './exports.js?v=1.8.0';
+import { createBridge } from './bridge.js?v=1.8.0';
 
 const $ = id => document.getElementById(id);
 const running = job => job && ['queued', 'candidates-generating', 'actions-generating', 'processing'].includes(job.status);
